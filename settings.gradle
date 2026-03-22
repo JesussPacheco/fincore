@@ -1,0 +1,9 @@
+rootProject.name = 'fincore'
+
+include 'config-server'
+include 'api-gateway'
+include 'auth-service'
+include 'account-service'
+include 'transaction-service'
+include 'notification-service'
+include 'audit-service'

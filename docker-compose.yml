@@ -1,0 +1,197 @@
+version: '3.8'
+
+# ============================================================
+# FinCore — Infraestructura local de desarrollo
+# Solo corre la infra. Tu código corre con ./gradlew bootRun
+# Uso: docker-compose up -d
+# Reset total: docker-compose down -v
+# ============================================================
+
+services:
+
+  # ──────────────────────────────────────────
+  # PostgreSQL — 4 databases, una por servicio
+  # ──────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: fincore-postgres
+    environment:
+      POSTGRES_USER: fincore
+      POSTGRES_PASSWORD: fincore123
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fincore -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fincore-net
+
+  # ──────────────────────────────────────────
+  # Redis — rate limiting, idempotency, locks
+  # ──────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: fincore-redis
+    command: redis-server --requirepass redis123 --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fincore-net
+
+  # ──────────────────────────────────────────
+  # Zookeeper — requerido por Kafka
+  # ──────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: fincore-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fincore-net
+
+  # ──────────────────────────────────────────
+  # Kafka — event bus
+  # ──────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: fincore-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # 9092 → acceso desde tu máquina (localhost)
+      # 29092 → acceso interno entre contenedores Docker
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks:
+      - fincore-net
+
+  # ──────────────────────────────────────────
+  # Kafka UI — interfaz web para ver topics
+  # http://localhost:8090
+  # ──────────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: fincore-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: fincore-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - fincore-net
+
+  # ──────────────────────────────────────────
+  # Zipkin — distributed tracing
+  # http://localhost:9411
+  # ──────────────────────────────────────────
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: fincore-zipkin
+    ports:
+      - "9411:9411"
+    environment:
+      - STORAGE_TYPE=mem
+    networks:
+      - fincore-net
+
+  # ──────────────────────────────────────────
+  # Prometheus — scraping de métricas
+  # http://localhost:9090
+  # ──────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: fincore-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - fincore-net
+
+  # ──────────────────────────────────────────
+  # Grafana — dashboards de métricas
+  # http://localhost:3000 (admin/admin)
+  # ──────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: fincore-grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - fincore-net
+
+# ──────────────────────────────────────────
+# Volúmenes — persisten datos entre reinicios
+# Para reset total: docker-compose down -v
+# ──────────────────────────────────────────
+volumes:
+  postgres_data:
+  redis_data:
+  zookeeper_data:
+  zookeeper_logs:
+  kafka_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  fincore-net:
+    driver: bridge

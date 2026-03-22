@@ -1,0 +1,13 @@
+# Este archivo se carga ANTES que application.yml
+# Le dice al servicio dónde encontrar el Config Server
+spring:
+  application:
+    name: auth-service
+  cloud:
+    config:
+      uri: ${CONFIG_SERVER_URL:http://localhost:8888}
+      fail-fast: true     # si no encuentra Config Server, no arranca
+      retry:
+        max-attempts: 5
+        initial-interval: 1000
+        max-interval: 5000

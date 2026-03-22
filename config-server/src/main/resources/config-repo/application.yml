@@ -1,0 +1,44 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+
+  cloud:
+    config:
+      server:
+        # Para desarrollo local usamos el filesystem como backend
+        # En producción esto apunta al repo GitHub privado:
+        #   git:
+        #     uri: https://github.com/tu-usuario/fincore-config-repo
+        #     default-label: main
+        #     search-paths: '{application}'
+        native:
+          search-locations: classpath:/config-repo
+
+    # Bus de Kafka para refresh distribuido
+    # POST /actuator/busrefresh → propaga refresh a todos los servicios
+    bus:
+      enabled: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+  # Para desarrollo local usa el filesystem
+  profiles:
+    active: native
+
+# Actuator — health check y refresh
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, busrefresh, refresh
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.config: DEBUG

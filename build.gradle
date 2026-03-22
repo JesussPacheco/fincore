@@ -1,0 +1,61 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.0' apply false
+    id 'io.spring.dependency-management' version '1.1.5' apply false
+}
+ 
+// Configuración compartida para todos los subproyectos
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'io.spring.dependency-management'
+ 
+    group = 'com.fincore'
+    version = '1.0.0'
+ 
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+ 
+    repositories {
+        mavenCentral()
+    }
+ 
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.boot:spring-boot-dependencies:3.3.0"
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:2023.0.2"
+        }
+    }
+ 
+    // Dependencias comunes a TODOS los servicios
+    dependencies {
+        // Lombok
+        compileOnly 'org.projectlombok:lombok'
+        annotationProcessor 'org.projectlombok:lombok'
+        testCompileOnly 'org.projectlombok:lombok'
+        testAnnotationProcessor 'org.projectlombok:lombok'
+ 
+        // Testing
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+        testImplementation 'org.mockito:mockito-core'
+    }
+ 
+    test {
+        useJUnitPlatform()
+    }
+ 
+    // Configuración de compilación Java 21
+    tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+        options.compilerArgs += ['--enable-preview']
+    }
+ 
+    tasks.withType(Test) {
+        jvmArgs '--enable-preview'
+    }
+ 
+    tasks.withType(JavaExec) {
+        jvmArgs '--enable-preview'
+    }
+}

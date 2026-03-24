@@ -1,4 +1,8 @@
 package com.fincore.auth.domain.port;
 
-public class PasswordEncoder {
+public interface PasswordEncoder {
+
+    String encode(String rawPassword);
+
+    boolean matches(String rawPassword, String encodedPassword);
 }

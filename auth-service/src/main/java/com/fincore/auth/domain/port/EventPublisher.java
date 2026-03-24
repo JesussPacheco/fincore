@@ -1,4 +1,6 @@
 package com.fincore.auth.domain.port;
 
-public class EventPublisher {
+public interface EventPublisher {
+
+    void publish(String topic, Object event);
 }

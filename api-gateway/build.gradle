@@ -1,6 +1,3 @@
-
-Copiar
-
 plugins {
     id 'org.springframework.boot'
 }

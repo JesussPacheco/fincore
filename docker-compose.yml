@@ -25,7 +25,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fincore -d auth_db"]
+      test: ["CMD-SHELL", "pg_isready -U fincore -d auth_db -h localhost -p 5432"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -66,7 +66,7 @@ services:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_logs:/var/lib/zookeeper/log
     healthcheck:
-      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      test: [ "CMD-SHELL", "echo srvr | nc localhost 2181 | grep Mode" ]
       interval: 10s
       timeout: 5s
       retries: 5

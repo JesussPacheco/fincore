@@ -4,6 +4,7 @@ import com.fincore.account.domain.model.Account;
 import com.fincore.account.domain.port.AccountRepository;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,7 +19,9 @@ public class AccountRepositoryImpl implements AccountRepository {
 
     @Override
     public Account save(Account account) {
-        return jpaRepository.save(AccountJpaEntity.fromDomain(account)).toDomain();
+        return jpaRepository.saveAndFlush(
+                AccountJpaEntity.fromDomain(account)
+        ).toDomain();
     }
 
     @Override
@@ -30,5 +33,15 @@ public class AccountRepositoryImpl implements AccountRepository {
     public Optional<Account> findByAccountNumber(String accountNumber) {
         return jpaRepository.findByAccountNumber(accountNumber)
                 .map(AccountJpaEntity::toDomain);
+    }
+
+    @Override
+    public int debitBalance(UUID accountId, BigDecimal amount) {
+        return jpaRepository.debitBalance(accountId, amount);
+    }
+
+    @Override
+    public int creditBalance(UUID accountId, BigDecimal amount) {
+        return jpaRepository.creditBalance(accountId, amount);
     }
 }

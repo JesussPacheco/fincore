@@ -7,8 +7,11 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -51,5 +54,35 @@ public class AccountController {
         return AccountResponse.fromDomain(
                 accountApplicationService.getBalance(accountId, UUID.fromString(userId))
         );
+    }
+
+    @PostMapping("/{accountId}/validate-balance")
+    public ResponseEntity<Void> validateBalance(
+            @PathVariable UUID accountId,
+            @RequestBody Map<String, Object> request) {
+
+        BigDecimal amount = new BigDecimal(request.get("amount").toString());
+        String currency   = request.get("currency").toString();
+
+        log.info("Validate balance request accountId={} amount={} currency={}",
+                accountId, amount, currency);
+
+        accountApplicationService.validateBalance(accountId, amount, currency);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{accountId}/credit")
+    public ResponseEntity<Void> credit(
+            @PathVariable UUID accountId,
+            @RequestBody Map<String, Object> request) {
+
+        BigDecimal amount = new BigDecimal(request.get("amount").toString());
+        String currency   = request.get("currency").toString();
+
+        log.info("Credit request accountId={} amount={} currency={}",
+                accountId, amount, currency);
+
+        accountApplicationService.credit(accountId, amount, currency);
+        return ResponseEntity.ok().build();
     }
 }

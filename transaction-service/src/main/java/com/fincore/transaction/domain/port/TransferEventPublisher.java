@@ -1,4 +1,6 @@
 package com.fincore.transaction.domain.port;
 
-public class TransferEventPublisher {
+public interface TransferEventPublisher {
+
+    void publish(String topic, Object event);
 }
